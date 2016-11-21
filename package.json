@@ -1,5 +1,5 @@
 {
-  "name": "justgage-meteor",
+  "name": "justgage-ionic2",
   "version": "1.2.4",
   "description": "This is a fork that allows to easily import JustGage into meteor. JustGage is a handy JavaScript plugin for generating and animating nice & clean gauges. It is based on Raphaël library for vector drawing, so it’s completely resolution independent and self-adjusting.",
   "main": "justgage.js",
@@ -8,7 +8,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/danielbh/justgage-meteor"
+    "url": "https://github.com/tehnorm/justgage-ionic2"
   },
   "keywords": [
     "gauge",

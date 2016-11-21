@@ -1,4 +1,9 @@
-This is a fork of original justgage module that allows easily importing the package to Meteor projects.
+This is a fork of original justgage module that allows easily importing the package to Ionic2 projects.
+
+```
+npm install git@github.com:tehnorm/justgage-ionic2.git --save
+import * as JustGage from 'justgage-ionic2';
+```
 
 JustGage is a handy JavaScript plugin for generating and animating nice &amp; clean dashboard gauges. It is based on Raphaël library for vector drawing.
 

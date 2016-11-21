@@ -10,6 +10,221 @@ const eve = require('eve')
 
 JustGage = function(config) {
 
+  //
+  // tiny helper function to lookup value of a key from two hash tables
+  // if none found, return defaultvalue
+  //
+  // key: string
+  // tablea: object
+  // tableb: DOMStringMap|object
+  // defval: string|integer|float|null
+  // datatype: return datatype
+  // delimiter: delimiter to be used in conjunction with datatype formatting
+  //
+  function kvLookup(key, tablea, tableb, defval, datatype, delimiter) {
+    var val = defval;
+    var canConvert = false;
+    if (!(key === null || key === undefined)) {
+      if (tableb !== null && tableb !== undefined && typeof tableb === "object" && key in tableb) {
+        val = tableb[key];
+        canConvert = true;
+      } else if (tablea !== null && tablea !== undefined && typeof tablea === "object" && key in tablea) {
+        val = tablea[key];
+        canConvert = true;
+      } else {
+        val = defval;
+      }
+      if (canConvert === true) {
+        if (datatype !== null && datatype !== undefined) {
+          switch (datatype) {
+            case 'int':
+              val = parseInt(val, 10);
+              break;
+            case 'float':
+              val = parseFloat(val);
+              break;
+            default:
+              break;
+          }
+        }
+      }
+    }
+    return val;
+  };
+  
+  /** Get color for value */
+  function getColor(val, pct, col, noGradient, custSec) {
+  
+    var no, inc, colors, percentage, rval, gval, bval, lower, upper, range, rangePct, pctLower, pctUpper, color;
+    var noGradient = noGradient || custSec.length > 0;
+  
+    if (custSec.length > 0) {
+      for (var i = 0; i < custSec.length; i++) {
+        if (val > custSec[i].lo && val <= custSec[i].hi) {
+          return custSec[i].color;
+        }
+      }
+    }
+  
+    no = col.length;
+    if (no === 1) return col[0];
+    inc = (noGradient) ? (1 / no) : (1 / (no - 1));
+    colors = [];
+    for (i = 0; i < col.length; i++) {
+      percentage = (noGradient) ? (inc * (i + 1)) : (inc * i);
+      rval = parseInt((cutHex(col[i])).substring(0, 2), 16);
+      gval = parseInt((cutHex(col[i])).substring(2, 4), 16);
+      bval = parseInt((cutHex(col[i])).substring(4, 6), 16);
+      colors[i] = {
+        pct: percentage,
+        color: {
+          r: rval,
+          g: gval,
+          b: bval
+        }
+      };
+    }
+  
+    if (pct === 0) {
+      return 'rgb(' + [colors[0].color.r, colors[0].color.g, colors[0].color.b].join(',') + ')';
+    }
+  
+    for (var j = 0; j < colors.length; j++) {
+      if (pct <= colors[j].pct) {
+        if (noGradient) {
+          return 'rgb(' + [colors[j].color.r, colors[j].color.g, colors[j].color.b].join(',') + ')';
+        } else {
+          lower = colors[j - 1];
+          upper = colors[j];
+          range = upper.pct - lower.pct;
+          rangePct = (pct - lower.pct) / range;
+          pctLower = 1 - rangePct;
+          pctUpper = rangePct;
+          color = {
+            r: Math.floor(lower.color.r * pctLower + upper.color.r * pctUpper),
+            g: Math.floor(lower.color.g * pctLower + upper.color.g * pctUpper),
+            b: Math.floor(lower.color.b * pctLower + upper.color.b * pctUpper)
+          };
+          return 'rgb(' + [color.r, color.g, color.b].join(',') + ')';
+        }
+      }
+    }
+  
+  }
+  
+  /** Fix Raphael display:none tspan dy attribute bug */
+  function setDy(elem, fontSize, txtYpos) {
+    if ((!ie || ie > 9) && elem.node.firstChild.attributes.dy) {
+      elem.node.firstChild.attributes.dy.value = 0;
+    }
+  }
+  
+  /** Random integer  */
+  function getRandomInt(min, max) {
+    return Math.floor(Math.random() * (max - min + 1)) + min;
+  }
+  
+  /**  Cut hex  */
+  function cutHex(str) {
+    return (str.charAt(0) == "#") ? str.substring(1, 7) : str;
+  }
+  
+  /**  Human friendly number suffix - From: http://stackoverflow.com/questions/2692323/code-golf-friendly-number-abbreviator */
+  function humanFriendlyNumber(n, d) {
+    var p, d2, i, s;
+  
+    p = Math.pow;
+    d2 = p(10, d);
+    i = 7;
+    while (i) {
+      s = p(10, i-- * 3);
+      if (s <= n) {
+        n = Math.round(n * d2 / s) / d2 + "KMGTPE" [i];
+      }
+    }
+    return n;
+  }
+  
+  /** Format numbers with commas - From: http://stackoverflow.com/questions/2901102/how-to-print-a-number-with-commas-as-thousands-separators-in-javascript */
+  function formatNumber(x) {
+    var parts = x.toString().split(".");
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    return parts.join(".");
+  }
+  
+  /**  Get style  */
+  function getStyle(oElm, strCssRule) {
+    var strValue = "";
+    if (document.defaultView && document.defaultView.getComputedStyle) {
+      strValue = document.defaultView.getComputedStyle(oElm, "").getPropertyValue(strCssRule);
+    } else if (oElm.currentStyle) {
+      strCssRule = strCssRule.replace(/\-(\w)/g, function(strMatch, p1) {
+        return p1.toUpperCase();
+      });
+      strValue = oElm.currentStyle[strCssRule];
+    }
+    return strValue;
+  }
+  
+  /**  Create Element NS Ready  */
+  function onCreateElementNsReady(func) {
+    if (document.createElementNS !== undefined) {
+      func();
+    } else {
+      setTimeout(function() {
+        onCreateElementNsReady(func);
+      }, 100);
+    }
+  }
+  
+  /**  Get IE version  */
+  // ----------------------------------------------------------
+  // A short snippet for detecting versions of IE in JavaScript
+  // without resorting to user-agent sniffing
+  // ----------------------------------------------------------
+  // If you're not in IE (or IE version is less than 5) then:
+  // ie === undefined
+  // If you're in IE (>=5) then you can determine which version:
+  // ie === 7; // IE7
+  // Thus, to detect IE:
+  // if (ie) {}
+  // And to detect the version:
+  // ie === 6 // IE6
+  // ie > 7 // IE8, IE9 ...
+  // ie < 9 // Anything less than IE9
+  // ----------------------------------------------------------
+  // UPDATE: Now using Live NodeList idea from @jdalton
+  var ie = (function() {
+  
+    var undef,
+      v = 3,
+      div = document.createElement('div'),
+      all = div.getElementsByTagName('i');
+  
+    while (
+      div.innerHTML = '<!--[if gt IE ' + (++v) + ']><i></i><![endif]-->',
+      all[0]
+    );
+    return v > 4 ? v : undef;
+  }());
+  
+  // extend target object with second object
+  function extend(out) {
+    out = out || {};
+  
+    for (var i = 1; i < arguments.length; i++) {
+      if (!arguments[i])
+        continue;
+  
+      for (var key in arguments[i]) {
+        if (arguments[i].hasOwnProperty(key))
+          out[key] = arguments[i][key];
+      }
+    }
+  
+    return out;
+  };
+
   var obj = this;
 
   // Helps in case developer wants to debug it. unobtrusive
@@ -1005,221 +1220,6 @@ JustGage.prototype.generateShadow = function(svg, defs) {
 
   // var clear
   gaussFilter, feOffset, feGaussianBlur, feComposite1, feFlood, feComposite2, feComposite3 = null;
-};
-
-//
-// tiny helper function to lookup value of a key from two hash tables
-// if none found, return defaultvalue
-//
-// key: string
-// tablea: object
-// tableb: DOMStringMap|object
-// defval: string|integer|float|null
-// datatype: return datatype
-// delimiter: delimiter to be used in conjunction with datatype formatting
-//
-function kvLookup(key, tablea, tableb, defval, datatype, delimiter) {
-  var val = defval;
-  var canConvert = false;
-  if (!(key === null || key === undefined)) {
-    if (tableb !== null && tableb !== undefined && typeof tableb === "object" && key in tableb) {
-      val = tableb[key];
-      canConvert = true;
-    } else if (tablea !== null && tablea !== undefined && typeof tablea === "object" && key in tablea) {
-      val = tablea[key];
-      canConvert = true;
-    } else {
-      val = defval;
-    }
-    if (canConvert === true) {
-      if (datatype !== null && datatype !== undefined) {
-        switch (datatype) {
-          case 'int':
-            val = parseInt(val, 10);
-            break;
-          case 'float':
-            val = parseFloat(val);
-            break;
-          default:
-            break;
-        }
-      }
-    }
-  }
-  return val;
-};
-
-/** Get color for value */
-function getColor(val, pct, col, noGradient, custSec) {
-
-  var no, inc, colors, percentage, rval, gval, bval, lower, upper, range, rangePct, pctLower, pctUpper, color;
-  var noGradient = noGradient || custSec.length > 0;
-
-  if (custSec.length > 0) {
-    for (var i = 0; i < custSec.length; i++) {
-      if (val > custSec[i].lo && val <= custSec[i].hi) {
-        return custSec[i].color;
-      }
-    }
-  }
-
-  no = col.length;
-  if (no === 1) return col[0];
-  inc = (noGradient) ? (1 / no) : (1 / (no - 1));
-  colors = [];
-  for (i = 0; i < col.length; i++) {
-    percentage = (noGradient) ? (inc * (i + 1)) : (inc * i);
-    rval = parseInt((cutHex(col[i])).substring(0, 2), 16);
-    gval = parseInt((cutHex(col[i])).substring(2, 4), 16);
-    bval = parseInt((cutHex(col[i])).substring(4, 6), 16);
-    colors[i] = {
-      pct: percentage,
-      color: {
-        r: rval,
-        g: gval,
-        b: bval
-      }
-    };
-  }
-
-  if (pct === 0) {
-    return 'rgb(' + [colors[0].color.r, colors[0].color.g, colors[0].color.b].join(',') + ')';
-  }
-
-  for (var j = 0; j < colors.length; j++) {
-    if (pct <= colors[j].pct) {
-      if (noGradient) {
-        return 'rgb(' + [colors[j].color.r, colors[j].color.g, colors[j].color.b].join(',') + ')';
-      } else {
-        lower = colors[j - 1];
-        upper = colors[j];
-        range = upper.pct - lower.pct;
-        rangePct = (pct - lower.pct) / range;
-        pctLower = 1 - rangePct;
-        pctUpper = rangePct;
-        color = {
-          r: Math.floor(lower.color.r * pctLower + upper.color.r * pctUpper),
-          g: Math.floor(lower.color.g * pctLower + upper.color.g * pctUpper),
-          b: Math.floor(lower.color.b * pctLower + upper.color.b * pctUpper)
-        };
-        return 'rgb(' + [color.r, color.g, color.b].join(',') + ')';
-      }
-    }
-  }
-
-}
-
-/** Fix Raphael display:none tspan dy attribute bug */
-function setDy(elem, fontSize, txtYpos) {
-  if ((!ie || ie > 9) && elem.node.firstChild.attributes.dy) {
-    elem.node.firstChild.attributes.dy.value = 0;
-  }
-}
-
-/** Random integer  */
-function getRandomInt(min, max) {
-  return Math.floor(Math.random() * (max - min + 1)) + min;
-}
-
-/**  Cut hex  */
-function cutHex(str) {
-  return (str.charAt(0) == "#") ? str.substring(1, 7) : str;
-}
-
-/**  Human friendly number suffix - From: http://stackoverflow.com/questions/2692323/code-golf-friendly-number-abbreviator */
-function humanFriendlyNumber(n, d) {
-  var p, d2, i, s;
-
-  p = Math.pow;
-  d2 = p(10, d);
-  i = 7;
-  while (i) {
-    s = p(10, i-- * 3);
-    if (s <= n) {
-      n = Math.round(n * d2 / s) / d2 + "KMGTPE" [i];
-    }
-  }
-  return n;
-}
-
-/** Format numbers with commas - From: http://stackoverflow.com/questions/2901102/how-to-print-a-number-with-commas-as-thousands-separators-in-javascript */
-function formatNumber(x) {
-  var parts = x.toString().split(".");
-  parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-  return parts.join(".");
-}
-
-/**  Get style  */
-function getStyle(oElm, strCssRule) {
-  var strValue = "";
-  if (document.defaultView && document.defaultView.getComputedStyle) {
-    strValue = document.defaultView.getComputedStyle(oElm, "").getPropertyValue(strCssRule);
-  } else if (oElm.currentStyle) {
-    strCssRule = strCssRule.replace(/\-(\w)/g, function(strMatch, p1) {
-      return p1.toUpperCase();
-    });
-    strValue = oElm.currentStyle[strCssRule];
-  }
-  return strValue;
-}
-
-/**  Create Element NS Ready  */
-function onCreateElementNsReady(func) {
-  if (document.createElementNS !== undefined) {
-    func();
-  } else {
-    setTimeout(function() {
-      onCreateElementNsReady(func);
-    }, 100);
-  }
-}
-
-/**  Get IE version  */
-// ----------------------------------------------------------
-// A short snippet for detecting versions of IE in JavaScript
-// without resorting to user-agent sniffing
-// ----------------------------------------------------------
-// If you're not in IE (or IE version is less than 5) then:
-// ie === undefined
-// If you're in IE (>=5) then you can determine which version:
-// ie === 7; // IE7
-// Thus, to detect IE:
-// if (ie) {}
-// And to detect the version:
-// ie === 6 // IE6
-// ie > 7 // IE8, IE9 ...
-// ie < 9 // Anything less than IE9
-// ----------------------------------------------------------
-// UPDATE: Now using Live NodeList idea from @jdalton
-var ie = (function() {
-
-  var undef,
-    v = 3,
-    div = document.createElement('div'),
-    all = div.getElementsByTagName('i');
-
-  while (
-    div.innerHTML = '<!--[if gt IE ' + (++v) + ']><i></i><![endif]-->',
-    all[0]
-  );
-  return v > 4 ? v : undef;
-}());
-
-// extend target object with second object
-function extend(out) {
-  out = out || {};
-
-  for (var i = 1; i < arguments.length; i++) {
-    if (!arguments[i])
-      continue;
-
-    for (var key in arguments[i]) {
-      if (arguments[i].hasOwnProperty(key))
-        out[key] = arguments[i][key];
-    }
-  }
-
-  return out;
 };
 
 module.exports = JustGage
