@@ -1,7 +1,7 @@
 This is a fork of original justgage module that allows easily importing the package to Ionic2 projects.
 
 ```
-npm install git@github.com:tehnorm/justgage-ionic2.git --save
+npm install git+https://git@github.com:tehnorm/justgage-ionic2.git#master --save
 import * as JustGage from 'justgage-ionic2';
 ```
 
